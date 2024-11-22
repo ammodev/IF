@@ -7,10 +7,12 @@ authlib = "1.5.26"
 adventure-api = "4.17.0"
 jupiter-engine = "5.11.1"
 commons-lang3 = "3.17.0"
+mccoroutine = "2.20.0"
 
 [libraries]
 authlib = { module = "com.mojang:authlib", version.ref = "authlib" }
 adventure-api = { module = "net.kyori:adventure-api", version.ref = "adventure-api" }
 jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "jupiter-engine" }
 spigot = { module = "org.spigotmc:spigot", version.ref = "spigot" }
-commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
+lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
+mccoroutine = { module = "com.github.shynixn.mccoroutine:mccoroutine-bukkit-api", version.ref = "mccoroutine" }

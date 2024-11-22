@@ -9,7 +9,3 @@ dependencies {
 }
 
 description = "abstraction"
-
-java {
-    withJavadocJar()
-}

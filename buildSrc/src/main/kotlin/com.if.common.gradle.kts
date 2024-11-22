@@ -1,5 +1,7 @@
 plugins {
     `java-library`
+
+    kotlin("jvm")
 }
 
 repositories {
@@ -16,9 +18,13 @@ repositories {
     maven("https://papermc.io/repo/repository/maven-public/")
 }
 
+val libs: VersionCatalog = the<VersionCatalogsExtension>().named("libs")
 dependencies {
     compileOnly("org.jetbrains:annotations:25.0.0")
     testCompileOnly("org.jetbrains:annotations:25.0.0")
+
+    api(libs.findLibrary("mccoroutine").orElseThrow())
+    compileOnlyApi(libs.findLibrary("lang3").orElseThrow())
 }
 
 group = "com.github.stefvanschie.inventoryframework"

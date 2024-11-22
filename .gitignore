@@ -8,3 +8,5 @@ IF-Test
 dependency-reduced-pom.xml
 *.log
 .paper-nms
+build/
+.gradle/

@@ -2,7 +2,7 @@ package com.github.stefvanschie.inventoryframework.nms.v1_21_1.util;
 
 import net.minecraft.core.NonNullList;
 import net.minecraft.world.item.ItemStack;
-import org.bukkit.craftbukkit.v1_21_R1.inventory.CraftItemStack;
+import org.bukkit.craftbukkit.inventory.CraftItemStack;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

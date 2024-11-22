@@ -4,7 +4,7 @@ import com.google.gson.JsonElement;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-import org.apache.commons.lang.Validate;
+import org.apache.commons.lang3.Validate;
 import org.bukkit.Material;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.ItemStack;
@@ -75,7 +75,7 @@ public abstract class ComponentHolder extends TextHolder {
                 Object ignored1 = holder.asInventoryTitle(null, 9);
                 //noinspection unused
                 Object ignored2 = holder.asInventoryTitle(null, InventoryType.HOPPER);
-                
+
                 ItemMeta meta = new ItemStack(Material.STONE).getItemMeta();
                 holder.asItemDisplayName(meta);
                 holder.asItemLoreAtEnd(meta);

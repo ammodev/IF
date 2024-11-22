@@ -3,6 +3,7 @@ package com.github.stefvanschie.inventoryframework.nms.v1_20_6;
 import com.github.stefvanschie.inventoryframework.abstraction.EnchantingTableInventory;
 import com.github.stefvanschie.inventoryframework.adventuresupport.TextHolder;
 import com.github.stefvanschie.inventoryframework.nms.v1_20_6.util.TextHolderUtil;
+import java.lang.reflect.Field;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
@@ -14,18 +15,16 @@ import net.minecraft.world.Container;
 import net.minecraft.world.inventory.EnchantmentMenu;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
-import org.bukkit.craftbukkit.v1_20_R4.entity.CraftPlayer;
-import org.bukkit.craftbukkit.v1_20_R4.inventory.CraftInventory;
-import org.bukkit.craftbukkit.v1_20_R4.inventory.CraftInventoryEnchanting;
-import org.bukkit.craftbukkit.v1_20_R4.inventory.CraftInventoryView;
-import org.bukkit.craftbukkit.v1_20_R4.inventory.CraftItemStack;
+import org.bukkit.craftbukkit.entity.CraftPlayer;
+import org.bukkit.craftbukkit.inventory.CraftInventory;
+import org.bukkit.craftbukkit.inventory.CraftInventoryEnchanting;
+import org.bukkit.craftbukkit.inventory.CraftInventoryView;
+import org.bukkit.craftbukkit.inventory.CraftItemStack;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.InventoryHolder;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
-import java.lang.reflect.Field;
 
 /**
  * Internal enchanting table inventory for 1.20.6
@@ -34,185 +33,191 @@ import java.lang.reflect.Field;
  */
 public class EnchantingTableInventoryImpl extends EnchantingTableInventory {
 
-    public EnchantingTableInventoryImpl(@NotNull InventoryHolder inventoryHolder) {
-        super(inventoryHolder);
+  public EnchantingTableInventoryImpl(@NotNull InventoryHolder inventoryHolder) {
+    super(inventoryHolder);
+  }
+
+  @Override
+  public void openInventory(@NotNull Player player, @NotNull TextHolder title,
+      @Nullable org.bukkit.inventory.ItemStack[] items) {
+    int itemAmount = items.length;
+
+    if (itemAmount != 2) {
+      throw new IllegalArgumentException(
+          "The amount of items for an enchanting table should be 2, but is '" + itemAmount + "'"
+      );
     }
 
-    @Override
-    public void openInventory(@NotNull Player player, @NotNull TextHolder title,
-                              @Nullable org.bukkit.inventory.ItemStack[] items) {
-        int itemAmount = items.length;
+    ServerPlayer serverPlayer = getServerPlayer(player);
+    Component message = TextHolderUtil.toComponent(title);
+    ContainerEnchantingTableImpl containerEnchantmentTable = new ContainerEnchantingTableImpl(
+        serverPlayer, items, message
+    );
 
-        if (itemAmount != 2) {
-            throw new IllegalArgumentException(
-                "The amount of items for an enchanting table should be 2, but is '" + itemAmount + "'"
-            );
-        }
+    serverPlayer.containerMenu = containerEnchantmentTable;
 
-        ServerPlayer serverPlayer = getServerPlayer(player);
-        Component message = TextHolderUtil.toComponent(title);
-        ContainerEnchantingTableImpl containerEnchantmentTable = new ContainerEnchantingTableImpl(
-                serverPlayer, items, message
-        );
+    int id = containerEnchantmentTable.containerId;
 
-        serverPlayer.containerMenu = containerEnchantmentTable;
+    serverPlayer.connection.send(
+        new ClientboundOpenScreenPacket(id, MenuType.ENCHANTMENT, message));
 
-        int id = containerEnchantmentTable.containerId;
+    sendItems(player, items);
+  }
 
-        serverPlayer.connection.send(new ClientboundOpenScreenPacket(id, MenuType.ENCHANTMENT, message));
+  @Override
+  public void sendItems(@NotNull Player player, @Nullable org.bukkit.inventory.ItemStack[] items) {
+    NonNullList<ItemStack> nmsItems = NonNullList.of(
+        ItemStack.EMPTY,
+        CraftItemStack.asNMSCopy(items[0]),
+        CraftItemStack.asNMSCopy(items[1])
+    );
 
-        sendItems(player, items);
-    }
+    ServerPlayer serverPlayer = getServerPlayer(player);
+    int containerId = getContainerId(serverPlayer);
+    int state = serverPlayer.containerMenu.incrementStateId();
+    ItemStack cursor = CraftItemStack.asNMSCopy(player.getItemOnCursor());
+    ServerPlayerConnection playerConnection = getPlayerConnection(serverPlayer);
 
-    @Override
-    public void sendItems(@NotNull Player player, @Nullable org.bukkit.inventory.ItemStack[] items) {
-        NonNullList<ItemStack> nmsItems = NonNullList.of(
-            ItemStack.EMPTY,
-            CraftItemStack.asNMSCopy(items[0]),
-            CraftItemStack.asNMSCopy(items[1])
-        );
+    playerConnection.send(
+        new ClientboundContainerSetContentPacket(containerId, state, nmsItems, cursor));
+  }
 
-        ServerPlayer serverPlayer = getServerPlayer(player);
-        int containerId = getContainerId(serverPlayer);
-        int state = serverPlayer.containerMenu.incrementStateId();
-        ItemStack cursor = CraftItemStack.asNMSCopy(player.getItemOnCursor());
-        ServerPlayerConnection playerConnection = getPlayerConnection(serverPlayer);
+  @Override
+  public void clearCursor(@NotNull Player player) {
+    ServerPlayer serverPlayer = getServerPlayer(player);
+    int state = serverPlayer.containerMenu.incrementStateId();
 
-        playerConnection.send(new ClientboundContainerSetContentPacket(containerId, state, nmsItems, cursor));
-    }
+    getPlayerConnection(serverPlayer).send(
+        new ClientboundContainerSetSlotPacket(-1, state, -1, ItemStack.EMPTY));
+  }
 
-    @Override
-    public void clearCursor(@NotNull Player player) {
-        ServerPlayer serverPlayer = getServerPlayer(player);
-        int state = serverPlayer.containerMenu.incrementStateId();
+  /**
+   * Gets the containerId id for the inventory view the player currently has open
+   *
+   * @param nmsPlayer the player to get the containerId id for
+   * @return the containerId id
+   * @since 0.10.14
+   */
+  @Contract(pure = true)
+  private int getContainerId(@NotNull net.minecraft.world.entity.player.Player nmsPlayer) {
+    return nmsPlayer.containerMenu.containerId;
+  }
 
-        getPlayerConnection(serverPlayer).send(new ClientboundContainerSetSlotPacket(-1, state, -1, ItemStack.EMPTY));
-    }
+  /**
+   * Gets the player connection for the specified player
+   *
+   * @param serverPlayer the player to get the player connection from
+   * @return the player connection
+   * @since 0.10.14
+   */
+  @NotNull
+  @Contract(pure = true)
+  private ServerPlayerConnection getPlayerConnection(@NotNull ServerPlayer serverPlayer) {
+    return serverPlayer.connection;
+  }
+
+  /**
+   * Gets the server player associated to this player
+   *
+   * @param player the player to get the server player from
+   * @return the server player
+   * @since 0.10.14
+   */
+  @NotNull
+  @Contract(pure = true)
+  private ServerPlayer getServerPlayer(@NotNull Player player) {
+    return ((CraftPlayer) player).getHandle();
+  }
+
+  /**
+   * A custom container enchanting table
+   *
+   * @since 0.10.14
+   */
+  private class ContainerEnchantingTableImpl extends EnchantmentMenu {
 
     /**
-     * Gets the containerId id for the inventory view the player currently has open
-     *
-     * @param nmsPlayer the player to get the containerId id for
-     * @return the containerId id
-     * @since 0.10.14
-     */
-    @Contract(pure = true)
-    private int getContainerId(@NotNull net.minecraft.world.entity.player.Player nmsPlayer) {
-        return nmsPlayer.containerMenu.containerId;
-    }
-
-    /**
-     * Gets the player connection for the specified player
-     *
-     * @param serverPlayer the player to get the player connection from
-     * @return the player connection
-     * @since 0.10.14
+     * The player for this enchanting table container
      */
     @NotNull
-    @Contract(pure = true)
-    private ServerPlayerConnection getPlayerConnection(@NotNull ServerPlayer serverPlayer) {
-        return serverPlayer.connection;
-    }
+    private final Player player;
 
     /**
-     * Gets the server player associated to this player
-     *
-     * @param player the player to get the server player from
-     * @return the server player
-     * @since 0.10.14
+     * The internal bukkit entity for this container enchanting table
+     */
+    @Nullable
+    private CraftInventoryView bukkitEntity;
+
+    /**
+     * Field for accessing the enchant slots field
      */
     @NotNull
-    @Contract(pure = true)
-    private ServerPlayer getServerPlayer(@NotNull Player player) {
-        return ((CraftPlayer) player).getHandle();
+    private final Field enchantSlotsField;
+
+    public ContainerEnchantingTableImpl(@NotNull ServerPlayer serverPlayer,
+        @Nullable org.bukkit.inventory.ItemStack[] items,
+        @NotNull Component title) {
+      super(serverPlayer.nextContainerCounter(), serverPlayer.getInventory());
+
+      this.player = serverPlayer.getBukkitEntity();
+
+      setTitle(title);
+
+      try {
+        //noinspection JavaReflectionMemberAccess
+        this.enchantSlotsField = EnchantmentMenu.class.getDeclaredField("o"); //enchantSlots
+        this.enchantSlotsField.setAccessible(true);
+      } catch (NoSuchFieldException exception) {
+        throw new RuntimeException(exception);
+      }
+
+      try {
+        Container input = (Container) enchantSlotsField.get(this);
+
+        input.setItem(0, CraftItemStack.asNMSCopy(items[0]));
+        input.setItem(1, CraftItemStack.asNMSCopy(items[1]));
+      } catch (IllegalAccessException e) {
+        e.printStackTrace();
+      }
     }
 
-    /**
-     * A custom container enchanting table
-     *
-     * @since 0.10.14
-     */
-    private class ContainerEnchantingTableImpl extends EnchantmentMenu {
-
-        /**
-         * The player for this enchanting table container
-         */
-        @NotNull
-        private final Player player;
-
-        /**
-         * The internal bukkit entity for this container enchanting table
-         */
-        @Nullable
-        private CraftInventoryView bukkitEntity;
-
-        /**
-         * Field for accessing the enchant slots field
-         */
-        @NotNull
-        private final Field enchantSlotsField;
-
-        public ContainerEnchantingTableImpl(@NotNull ServerPlayer serverPlayer,
-                                            @Nullable org.bukkit.inventory.ItemStack[] items,
-                                            @NotNull Component title) {
-            super(serverPlayer.nextContainerCounter(), serverPlayer.getInventory());
-
-            this.player = serverPlayer.getBukkitEntity();
-
-            setTitle(title);
-
-            try {
-                //noinspection JavaReflectionMemberAccess
-                this.enchantSlotsField = EnchantmentMenu.class.getDeclaredField("o"); //enchantSlots
-                this.enchantSlotsField.setAccessible(true);
-            } catch (NoSuchFieldException exception) {
-                throw new RuntimeException(exception);
+    @NotNull
+    @Override
+    public CraftInventoryView getBukkitView() {
+      if (bukkitEntity == null) {
+        try {
+          CraftInventory inventory = new CraftInventoryEnchanting(
+              (Container) enchantSlotsField.get(this)) {
+            @NotNull
+            @Contract(pure = true)
+            @Override
+            public InventoryHolder getHolder() {
+              return inventoryHolder;
             }
+          };
 
-            try {
-                Container input = (Container) enchantSlotsField.get(this);
-
-                input.setItem(0, CraftItemStack.asNMSCopy(items[0]));
-                input.setItem(1, CraftItemStack.asNMSCopy(items[1]));
-            } catch (IllegalAccessException e) {
-                e.printStackTrace();
-            }
+          bukkitEntity = new CraftInventoryView(player, inventory, this);
+        } catch (IllegalAccessException exception) {
+          exception.printStackTrace();
         }
+      }
 
-        @NotNull
-        @Override
-        public CraftInventoryView getBukkitView() {
-            if (bukkitEntity == null) {
-                try {
-                    CraftInventory inventory = new CraftInventoryEnchanting((Container) enchantSlotsField.get(this)) {
-                        @NotNull
-                        @Contract(pure = true)
-                        @Override
-                        public InventoryHolder getHolder() {
-                            return inventoryHolder;
-                        }
-                    };
-
-                    bukkitEntity = new CraftInventoryView(player, inventory, this);
-                } catch (IllegalAccessException exception) {
-                    exception.printStackTrace();
-                }
-            }
-
-            return bukkitEntity;
-        }
-
-        @Contract(pure = true, value = "_ -> true")
-        @Override
-        public boolean stillValid(@Nullable net.minecraft.world.entity.player.Player nmsPlayer) {
-            return true;
-        }
-
-        @Override
-        public void slotsChanged(Container container) {}
-
-        @Override
-        public void removed(net.minecraft.world.entity.player.Player nmsPlayer) {}
-
+      return bukkitEntity;
     }
+
+    @Contract(pure = true, value = "_ -> true")
+    @Override
+    public boolean stillValid(@Nullable net.minecraft.world.entity.player.Player nmsPlayer) {
+      return true;
+    }
+
+    @Override
+    public void slotsChanged(Container container) {
+    }
+
+    @Override
+    public void removed(net.minecraft.world.entity.player.Player nmsPlayer) {
+    }
+
+  }
 }
